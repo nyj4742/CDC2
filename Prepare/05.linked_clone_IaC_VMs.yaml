@@ -1,0 +1,93 @@
+---
+- hosts: localhost
+  vars:
+    ansible_python_interpreter: /bin/python3
+    vcenter_hostname: "200.200.200.251"
+    vcenter_username: "administrator@vsphere.kh"
+    vcenter_password: "VMware1!"
+    datacenter_name: "KH-5th"
+    snapshot_src: "for_linkedclone"
+
+  tasks:
+
+  - name: Create a snapshot for linked clone
+    community.vmware.vmware_guest_snapshot:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      folder: "/{{ datacenter_name }}/vm/2.Templates"
+      name: "{{ item }}"
+      state: present
+      snapshot_name: "{{ snapshot_src }}"
+    loop:
+      - IaC-01
+      - IaC-02
+      - IaC-03
+      - IaC-04
+      - IaC-05  
+    delegate_to: localhost
+
+
+  - name: Deploy IaC VM from Template
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item.student_id + '-IaC' }}"
+      state: "poweredon"
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ '3.Students/' + item.student_id }}"
+      esxi_hostname: '{{ item.esxi }}'
+      datastore: "{{ item.datastore }}"
+      template: "{{ item.source }}"
+      linked_clone: true
+      snapshot_src: "{{ snapshot_src }}"
+    loop:
+    - { student_id: S01, esxi: kh-esxi-01.vclass.kh, datastore: Local-khesxi01, source: IaC-01 }  
+    - { student_id: S02, esxi: kh-esxi-02.vclass.kh, datastore: Local-khesxi02, source: IaC-02 }  
+    - { student_id: S03, esxi: kh-esxi-03.vclass.kh, datastore: Local-khesxi03, source: IaC-03 }  
+    - { student_id: S04, esxi: kh-esxi-04.vclass.kh, datastore: Local-khesxi04, source: IaC-04 }  
+    - { student_id: S05, esxi: kh-esxi-05.vclass.kh, datastore: Local-khesxi05, source: IaC-05 }  
+    - { student_id: S06, esxi: kh-esxi-01.vclass.kh, datastore: Local-khesxi01, source: IaC-01 }  
+    - { student_id: S07, esxi: kh-esxi-02.vclass.kh, datastore: Local-khesxi02, source: IaC-02 }  
+    - { student_id: S08, esxi: kh-esxi-03.vclass.kh, datastore: Local-khesxi03, source: IaC-03 }  
+    - { student_id: S09, esxi: kh-esxi-04.vclass.kh, datastore: Local-khesxi04, source: IaC-04 }  
+    - { student_id: S10, esxi: kh-esxi-05.vclass.kh, datastore: Local-khesxi05, source: IaC-05 }  
+    - { student_id: S11, esxi: kh-esxi-01.vclass.kh, datastore: Local-khesxi01, source: IaC-01 }  
+    - { student_id: S12, esxi: kh-esxi-02.vclass.kh, datastore: Local-khesxi02, source: IaC-02 }  
+    - { student_id: S13, esxi: kh-esxi-03.vclass.kh, datastore: Local-khesxi03, source: IaC-03 }  
+    - { student_id: S14, esxi: kh-esxi-04.vclass.kh, datastore: Local-khesxi04, source: IaC-04 }  
+    - { student_id: S15, esxi: kh-esxi-05.vclass.kh, datastore: Local-khesxi05, source: IaC-05 }  
+    - { student_id: S16, esxi: kh-esxi-01.vclass.kh, datastore: Local-khesxi01, source: IaC-01 }  
+    - { student_id: S17, esxi: kh-esxi-02.vclass.kh, datastore: Local-khesxi02, source: IaC-02 }  
+    - { student_id: S18, esxi: kh-esxi-03.vclass.kh, datastore: Local-khesxi03, source: IaC-03 }  
+    - { student_id: S19, esxi: kh-esxi-04.vclass.kh, datastore: Local-khesxi04, source: IaC-04 }  
+    - { student_id: S20, esxi: kh-esxi-05.vclass.kh, datastore: Local-khesxi05, source: IaC-05 }  
+    - { student_id: S21, esxi: kh-esxi-01.vclass.kh, datastore: Local-khesxi01, source: IaC-01 }  
+    - { student_id: S22, esxi: kh-esxi-02.vclass.kh, datastore: Local-khesxi02, source: IaC-02 }  
+#    - { student_id: S23, esxi: kh-esxi-03.vclass.kh, datastore: Local-khesxi03, source: IaC-03 }  
+#    - { student_id: S24, esxi: kh-esxi-04.vclass.kh, datastore: Local-khesxi04, source: IaC-04 }  
+    delegate_to: localhost
+ 
+
+  - name: Remove a snapshot for linked clone
+    community.vmware.vmware_guest_snapshot:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      folder: "/{{ datacenter_name }}/vm/2.Templates"
+      name: "{{ item }}"
+      state: absent
+      snapshot_name: "{{ snapshot_src }}"
+    loop:
+      - IaC-01
+      - IaC-02
+      - IaC-03
+      - IaC-04
+      - IaC-05  
+    delegate_to: localhost
