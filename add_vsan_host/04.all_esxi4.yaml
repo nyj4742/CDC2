@@ -1,0 +1,79 @@
+- hosts: localhost
+  vars:
+    ansible_python_interpreter: /bin/python3
+    vcenter_hostname: "vcsa.vclass.kh"
+    vcenter_username: "S00@vclass.kh"
+    vcenter_password: "VMware1!"
+    datacenter_name: "KH"
+    folder_prefix: "KH/vm/3.Students/"
+    
+  tasks: 
+    - name: Create SiteA ESXi VMs
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false  # 여전히 false로 설정되어 있지만, 실제 환경에서는 true로 설정하는 것이 좋습니다.
+        datacenter: '{{ datacenter_name }}'
+        folder: '{{ item.folder }}'
+        name: '{{ item.vmname }}'
+        state: poweredon
+        guest_id: vmkernel7Guest
+        esxi_hostname: "{{ item.host }}"
+        hardware:
+          num_cpus: 4
+          nested_virt: yes
+          memory_mb: 16384
+        disk:
+          - size_gb: 200
+            controller_type: 'paravirtual'
+            controller_number: 0
+            unit_number: 0
+            type: thin
+            datastore: '{{ item.datastore }}'
+          - size_gb: 50
+            controller_type: 'nvme'
+            controller_number: 0
+            unit_number: 0
+            type: thin
+            datastore: '{{ item.datastore }}'
+          - size_gb: 50
+            controller_type: 'nvme'
+            controller_number: 0
+            unit_number: 1
+            type: thin
+            datastore: '{{ item.datastore }}'
+          - size_gb: 200
+            controller_type: 'nvme'
+            controller_number: 0
+            unit_number: 2
+            type: thin
+            datastore: '{{ item.datastore }}'
+          - size_gb: 200
+            controller_type: 'nvme'
+            controller_number: 0
+            unit_number: 3
+            type: thin
+            datastore: '{{ item.datastore }}'
+        networks:
+          - name: "{{ item.student_ID }}-SA-Mgmt"
+            device_type: vmxnet3
+          - name: "{{ item.student_ID }}-SA-Mgmt"
+            device_type: vmxnet3
+          - name: "{{ item.student_ID }}-Trunk"
+            device_type: vmxnet3
+          - name: "{{ item.student_ID }}-Trunk"
+            device_type: vmxnet3
+        cdrom:
+          controller_number: 0
+          unit_number: 0
+          state: present
+          type: iso
+          iso_path: '{{ "[" + item.datastore + "]\\ISO\\VMware-VMvisor-Installer-8.0U2b-23305546.x86_64.iso" }}'
+      loop:
+        - {student_ID: S00, folder: folder_prefix + 'S00', vmname: 'S00-SA-ESXi-04', host: 'kh-esxi-05.vclass.kh', datastore: 'Local-khesxi05'}
+        - {student_ID: S01, folder: folder_prefix + 'S01', vmname: 'S01-SA-ESXi-04', host: 'kh-esxi-01.vclass.kh', datastore: 'Local-khesxi01'}
+        - {student_ID: S02, folder: folder_prefix + 'S02', vmname: 'S02-SA-ESXi-04', host: 'kh-esxi-02.vclass.kh', datastore: 'Local-khesxi02'}
+
+      delegate_to: localhost
+      register: deploy_vm
