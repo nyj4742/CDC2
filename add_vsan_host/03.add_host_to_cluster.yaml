@@ -1,0 +1,168 @@
+---
+- name : vSphere Quick Start
+  hosts: localhost
+
+  vars:
+    ansible_python_interpreter: /bin/python3
+    vcenter_hostname: "sa-vcsa-01.vclass.local"
+    vcenter_username: "administrator@vsphere.local"
+    vcenter_password: "VMware1!"
+    datacenter_name: "KH"  ## 수정필요
+    cluster_name: "S00" ## 수정필요
+    esxi_username: "root"
+    esxi_password: "VMware1!"
+    DSwitch_name: "DSwitch"
+
+  tasks: 
+  - name: 01.Add ESXi Host to vCenter
+    community.vmware.vmware_host:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: no
+      datacenter_name: '{{ datacenter_name }}'
+      cluster_name: '{{ cluster_name }}'
+      esxi_hostname: '{{ item }}'
+      esxi_username: 'root'
+      esxi_password: 'VMware1!'
+      state: present
+    loop:
+      - "sa-esxi-04.vclass.local"
+    delegate_to: localhost
+
+
+  - name: 02.Add Host to dVS
+    community.vmware.vmware_dvs_host:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: no        
+      esxi_hostname: '{{ item }}'
+      switch_name: '{{ DSwitch_name }}'
+      vmnics:
+        - vmnic2
+        - vmnic3
+      state: present
+    loop:
+      - "sa-esxi-04.vclass.local"
+    delegate_to: localhost
+
+    
+  - name: 03.Add iSCSI vmkernel port
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: no
+      esxi_hostname: '{{ item.esxi_host }}'
+      dvswitch_name: '{{ DSwitch_name }}'
+      portgroup_name: '{{ item.portgroup }}'
+      network:
+        type: 'static'
+        ip_address: '{{ item.iscsi_ip }}'
+        subnet_mask: 255.255.255.0
+      state: present
+    loop:
+    - { esxi_host: sa-esxi-04.vclass.local, portgroup: DPG-iSCSI-0, iscsi_ip: 10.10.11.14 }
+    - { esxi_host: sa-esxi-04.vclass.local, portgroup: DPG-iSCSI-1, iscsi_ip: 10.10.11.24 }
+    delegate_to: localhost
+
+  - name: 04.Add vMotion vmkernel port
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: no
+      esxi_hostname: '{{ item.esxi_host }}'
+      dvswitch_name: '{{ DSwitch_name }}'
+      portgroup_name: '{{ item.portgroup }}' 
+      network:
+        type: 'static'
+        ip_address: '{{ item.vmotionip }}'
+        subnet_mask: 255.255.255.0
+        tcpip_stack: vmotion
+      state: present
+      enable_vmotion: yes
+    loop:
+    - { esxi_host: sa-esxi-04.vclass.local, portgroup: DPG-vMotion, vmotionip: 10.10.12.14 }
+    delegate_to: localhost
+
+  - name: 05.vMotion tcp/ip stack gateway
+    community.vmware.vmware_host_tcpip_stacks:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      esxi_hostname: '{{ item }}'
+      vmotion:
+        gateway: 10.10.12.1
+    loop:
+      - sa-esxi-04.vclass.local
+    delegate_to: localhost
+
+  - name: 06.Create Software iSCSI Adapter
+    community.vmware.vmware_host_iscsi:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      esxi_hostname: "{{ item }}"
+      state: enabled
+    loop:
+      - sa-esxi-04.vclass.local
+    delegate_to: localhost
+
+  - name: 07. Set Port Binding and Target
+    community.vmware.vmware_host_iscsi:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      esxi_hostname: "{{ item }}"
+      iscsi_config:
+        vmhba_name: vmhba65
+        port_bind:
+          - vmk1
+          - vmk2
+        send_target:
+          address: 10.10.11.20
+    loop:
+      - sa-esxi-04.vclass.local
+    delegate_to: localhost
+
+  - name: 08.Recan HBA for cluster
+    community.vmware.vmware_host_scanhba:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: no
+      esxi_hostname: '{{ item }}'
+      rescan_vmfs: true
+      rescan_hba: true
+    loop:
+      - sa-esxi-04.vclass.local
+    delegate_to: localhost
+
+  - name: 09.Wait for complete rescan HBA
+    wait_for:
+      timeout: 10
+    delegate_to: localhost
+
+  - name: 10.Add vSAN vmkernel port
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: no
+      esxi_hostname: '{{ item.esxi_host }}'
+      dvswitch_name: '{{ DSwitch_name }}'
+      portgroup_name: '{{ item.portgroup }}'
+      enable_vsan: true
+      network:
+        type: 'static'
+        ip_address: '{{ item.vsan_ip }}'
+        subnet_mask: 255.255.255.0
+      state: present
+    loop:
+    - { esxi_host: sa-esxi-04.vclass.local, portgroup: DPG-vSAN, vsan_ip: 10.10.14.14 }
+    delegate_to: localhost
